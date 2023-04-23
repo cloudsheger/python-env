@@ -1,0 +1,50 @@
+FROM alpine:3.17
+
+# This hack is widely applied to avoid python printing issues in docker containers.
+# See: https://github.com/Docker-Hub-frolvlad/docker-alpine-python3/pull/13
+ENV PYTHONUNBUFFERED=1
+
+RUN echo "**** install build dependencies ****" && \
+    apk add --no-cache --virtual .build-deps \
+        build-base \
+        openssl-dev \
+        libffi-dev \
+        zlib-dev \
+        bzip2-dev \
+        readline-dev \
+        sqlite-dev && \
+    \
+    echo "**** download Python 3.10 ****" && \
+    wget -q https://www.python.org/ftp/python/3.10.0/Python-3.10.0.tgz && \
+    tar xzf Python-3.10.0.tgz && \
+    cd Python-3.10.0 && \
+    \
+    echo "**** configure Python 3.10 ****" && \
+    ./configure --enable-optimizations && \
+    \
+    echo "**** build and install Python 3.10 ****" && \
+    make -j "$(nproc)" && \
+    make altinstall && \
+    \
+    echo "**** create symbolic links ****" && \
+    ln -s /usr/local/bin/python3.10 /usr/local/bin/python && \
+    ln -s /usr/local/bin/pip3.10 /usr/local/bin/pip && \
+    \
+    echo "**** install pipenv and pytest ****" && \
+    pip install pipenv pytest && \
+    \
+    echo "**** cleanup ****" && \
+    cd .. && \
+    rm -rf Python-3.10.0* && \
+    apk del .build-deps && \
+    rm -rf /var/cache/apk/*
+
+ENV PATH=/usr/local/bin:$PATH
+
+RUN python --version
+RUN pip --version
+RUN pipenv --version
+RUN pytest --version
+
+#docker build -t app-test -f Dockerfile.build .
+#docker run -it alpine-python-3.10 sh

@@ -1,0 +1,54 @@
+FROM alpine:3.17
+
+# Parameters for Python and pip versions
+ARG PYTHON_VERSION=3.11.0
+
+# This hack is widely applied to avoid python printing issues in docker containers.
+# See: https://github.com/Docker-Hub-frolvlad/docker-alpine-python3/pull/13
+ENV PYTHONUNBUFFERED=1
+
+RUN echo "**** install build dependencies ****" && \
+    apk add --no-cache --virtual .build-deps \
+        build-base \
+        openssl-dev \
+        libffi-dev \
+        zlib-dev \
+        bzip2-dev \
+        readline-dev \
+        sqlite-dev && \
+    \
+    echo "**** download Python $PYTHON_VERSION ****" && \
+    wget -q https://www.python.org/ftp/python/$PYTHON_VERSION/Python-$PYTHON_VERSION.tgz && \
+    tar xzf Python-$PYTHON_VERSION.tgz && \
+    cd Python-$PYTHON_VERSION && \
+    \
+    echo "**** configure Python $PYTHON_VERSION ****" && \
+    ./configure --enable-optimizations && \
+    \
+    echo "**** build and install Python $PYTHON_VERSION ****" && \
+    make -j "$(nproc)" && \
+    make altinstall && \
+    \
+    echo "**** create symbolic links ****" && \
+    ln -s /usr/local/bin/python3.11 /usr/local/bin/python && \
+    ln -s /usr/local/bin/pip3.11 /usr/local/bin/pip && \
+    \
+    echo "**** install pipenv and pytest ****" && \
+    pip install pipenv pytest && \
+    \
+    echo "**** install linter ****" && \
+    pip install pylint && \
+    \
+    echo "**** cleanup ****" && \
+    cd .. && \
+    rm -rf Python-$PYTHON_VERSION* && \
+    apk del .build-deps && \
+    rm -rf /var/cache/apk/*
+
+ENV PATH=/usr/local/bin:$PATH
+
+RUN python --version
+RUN pip --version
+RUN pipenv --version
+RUN pytest --version
+RUN pylint --version
